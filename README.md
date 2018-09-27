@@ -14,3 +14,8 @@
  
 #### Если SteamWorks установлен впервые - перезагрузить сервер, если нет - только плагин.
 ## По вопросам : [vk.com/xtance](https://vk.com/xtance "Мой вконтактик") + [t.me/xtance](https://t.me/xtance "Уютная телега") + тема на HLmod :з
+
+Скриншоты :
+![screen1](https://imgur.com/cnG0iK3 "Screen 1")
+![screen2](https://imgur.com/VNDZuwN "Screen 2")
+![screen3](https://imgur.com/OE3qyg8 "Screen 3")
