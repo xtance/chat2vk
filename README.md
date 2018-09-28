@@ -2,6 +2,7 @@
 Позволяет отправлять сообщение в чат ВКонтакте прямо из сервера. 
 ### !vk любой текст
 Плагин тестировался только для CS:GO, требует SteamWorks : http://users.alliedmods.net/~kyles/builds/SteamWorks/
+Для компилирования нужно кинуть в /scripting/include следующие INC : [SourceComms](https://github.com/sbpp/sourcebans-pp/tree/v1.x/game/addons/sourcemod/scripting/include) , [ColorVariables](https://github.com/PremyslTalich/ColorVariables/blob/master/addons/sourcemod/scripting/includes/colorvariables.inc) , [Autoexecconfig](https://github.com/Impact123/AutoExecConfig/blob/development/autoexecconfig.inc) , и [SW](https://github.com/KyleSanderson/SteamWorks/blob/master/Pawn/includes/SteamWorks.inc)
  
 ## Как пользоваться плагином Chat2VK :
 0) Кинуть chat2vk.smx в csgo/addons/sourcemod/plugins и запустить его (для генерации конфига)
