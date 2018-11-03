@@ -37,7 +37,7 @@ public void OnPluginStart()
 {
 	AutoExecConfig_SetFile("chat2vk", "sourcemod");
 	AutoExecConfig_SetCreateFile(true);
-	g_sourcecomms = AutoExecConfig_CreateConVar("g_sourcecomms", "0", "SourceComms Support : 1=ON, 0=OFF");
+	g_sourcecomms = CreateConVar("g_sourcecomms", "0", "SourceComms Support : 1=ON, 0=OFF");
 	g_token = AutoExecConfig_CreateConVar("g_token", "thisisyourtoken", "Токен от группы VK. Подробнее : https://pastebin.com/YQ2dwGWY");
 	g_msgPerRound = AutoExecConfig_CreateConVar("g_msgPerRound", "3", "Сколько сообщений в раунд можно отправить.");
 	g_servername = AutoExecConfig_CreateConVar("g_servername", "1", "Указывать название сервера в сообщении.");
@@ -46,6 +46,7 @@ public void OnPluginStart()
 	g_link = AutoExecConfig_CreateConVar("g_link", "1", "Вставлять ссылку на игрока вместо его SteamID в сообщении.");
 	AutoExecConfig_ExecuteFile();
 	RegConsoleCmd("sm_vk", VKsay, "Send a message to VK conversation");
+	RegConsoleCmd("sm_send", VKsend, "Command to send message from VK to server, don't touch it!");
 	HookEvent("round_start", RoundStart, EventHookMode_Post);
 	
 	CreateDirectory("addons/sourcemod/data/chat2vk",511);
@@ -88,6 +89,31 @@ public void OnConfigsExecuted()
 		ReplaceString(szSName, sizeof(szSName), " ", "%20", false);
 	}
 	
+}
+
+public Action VKsend(int iClient, int iArgs)
+{
+	if ((iArgs < 1) || (iClient > 0))
+	{
+		PrintToServer("[Chat2VK] %N зачем-то написал /send", iClient);
+		return Plugin_Handled;
+	}
+	else
+	{
+		char szTextFromVK[400], szTipaBuffer[2][400];
+		GetCmdArgString(szTextFromVK, sizeof(szTextFromVK));
+		ReplaceString(szTextFromVK, sizeof(szTextFromVK), "\"", "", false);
+		ExplodeString(szTextFromVK, "&", szTipaBuffer, sizeof(szTipaBuffer), sizeof(szTipaBuffer[]));
+		
+		CPrintToChatAll("{darkblue}>>{default} %s {darkblue}пишет из VK :", szTipaBuffer[0]);
+		CPrintToChatAll( "{darkblue}>>{default} %s " , szTipaBuffer[1] );
+		
+		if (g_logging.BoolValue)
+		{
+			LogAction(iClient, -1, "%s пишет из VK : %s", szTipaBuffer[0],szTipaBuffer[1]);
+		}
+		return Plugin_Handled;
+	}
 }
 
 public Action VKsay(int iClient, int iArgs)
