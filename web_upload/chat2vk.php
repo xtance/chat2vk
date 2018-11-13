@@ -59,18 +59,19 @@ switch ($data->type) {
 			if(strpos($message, $cmd1) === 0) {
 				$r = new rcon($ip1,$port1,$pass1);
 			}
-			if(strpos($message, $cmd2) === 0) {
+			else if(strpos($message, $cmd2) === 0) {
 				$r = new rcon($ip2,$port2,$pass2);
 			}
-			if(strpos($message, $cmd3) === 0) {
+			else if(strpos($message, $cmd3) === 0) {
 				$r = new rcon($ip3,$port3,$pass3);
 			}
-			if(strpos($message, $cmd4) === 0) {
+			else if(strpos($message, $cmd4) === 0) {
 				$r = new rcon($ip4,$port4,$pass4);
 			}
-			if(strpos($message, $cmd5) === 0) {
+			else if(strpos($message, $cmd5) === 0) {
 				$r = new rcon($ip5,$port5,$pass5);
 			}
+			else { break; }
 			
 			$r->Auth();
 			$userId = $data->object->from_id;
