@@ -1,11 +1,18 @@
 #include <sourcemod>
 #include <cstrike>
 #include <colorvariables>
-#include <SteamWorks>
 #include <autoexecconfig>
 
 #undef REQUIRE_PLUGIN
 #include <sourcecomms>
+
+
+#undef REQUIRE_EXTENSIONS
+#tryinclude <SteamWorks>
+#tryinclude <ripext>
+
+#define STEAMWORKS_ON()	(CanTestFeatures() && GetFeatureStatus(FeatureType_Native, "SteamWorks_CreateHTTPRequest")	== FeatureStatus_Available)
+#define RIP_ON()		(CanTestFeatures() && GetFeatureStatus(FeatureType_Native, "HTTPClient.HTTPClient")			== FeatureStatus_Available)
 
 #pragma semicolon 1
 #pragma newdecls required
@@ -33,8 +40,16 @@ public Plugin myinfo =
 	url = "https://t.me/xtance"
 };
 
+#if defined _ripext_included_
+HTTPClient g_hHTTPClient ;
+#endif
+	
 public void OnPluginStart()
 {
+	#if defined _ripext_included_
+	g_hHTTPClient = new HTTPClient("https://api.vk.com");
+	#endif
+
 	AutoExecConfig_SetFile("chat2vk", "sourcemod");
 	AutoExecConfig_SetCreateFile(true);
 	g_sourcecomms = CreateConVar("g_sourcecomms", "0", "SourceComms Support : 1=ON, 0=OFF");
@@ -60,6 +75,26 @@ public void OnPluginStart()
 			CloseHandle(hFile);
 		}
 	}
+}
+public APLRes AskPluginLoad2(Handle hMySelf, bool bLate, char[] szError, int iErr_max)
+{
+#if defined _SteamWorks_Included
+	MarkNativeAsOptional("SteamWorks_CreateHTTPRequest");
+	MarkNativeAsOptional("SteamWorks_SetHTTPRequestRawPostBody");
+	MarkNativeAsOptional("SteamWorks_SetHTTPCallbacks");
+	MarkNativeAsOptional("SteamWorks_WriteHTTPResponseBodyToFile");
+	MarkNativeAsOptional("SteamWorks_SendHTTPRequest");
+#endif
+#if defined _ripext_included_
+	MarkNativeAsOptional("HTTPClient.HTTPClient");
+	MarkNativeAsOptional("HTTPClient.SetHeader");
+	MarkNativeAsOptional("HTTPClient.Post");
+	MarkNativeAsOptional("HTTPResponse.Data.get");
+	MarkNativeAsOptional("HTTPResponse.Status.get");
+	MarkNativeAsOptional("JSONObject.JSONObject");
+	MarkNativeAsOptional("JSONObject.SetString");
+#endif
+	return APLRes_Success;
 }
 
 public Action RoundStart(Event event, const char[] name, bool dontBroadcast)
@@ -126,13 +161,14 @@ public Action VKsend(int iClient, int iArgs)
 			{
 				FormatEx(szURL, sizeof(szURL), "https://api.vk.com/method/messages.send?chat_id=1&message=Онлайн : %i игроков. Карта : %s^:-^:-%s&v=5.80&access_token=%s",iC,szMap[2],szName,szToken);
 			}
-			ReplaceString(szURL, sizeof(szURL), " ", "%20", false);
-			ReplaceString(szURL, sizeof(szURL), "^:-", "%0A", false);
-			ReplaceString(szURL, sizeof(szURL), "#", "%23", false);
-			Handle req = SteamWorks_CreateHTTPRequest(k_EHTTPMethodGET, szURL);
-			SteamWorks_SetHTTPCallbacks(req, OnRequestComplete);
-			SteamWorks_SetHTTPRequestHeaderValue(req, "User-Agent", "Test");
-			SteamWorks_SendHTTPRequest(req);
+			ReplaceString(szURL, sizeof(szURL), " ", "%20");
+			ReplaceString(szURL, sizeof(szURL), "^", "%5E");
+			ReplaceString(szURL, sizeof(szURL), ":", "%3A");
+			ReplaceString(szURL, sizeof(szURL), "#", "%23");
+			ReplaceString(szURL, sizeof(szURL), "+", "%2B");
+			
+			SendMessage(szURL);
+			
 			return Plugin_Handled;
 		}
 		
@@ -228,11 +264,9 @@ public Action VKsay(int iClient, int iArgs)
 		
 		//Дебаг :
 		//PrintToConsole(iClient,szURL);
-		
-		Handle req = SteamWorks_CreateHTTPRequest(k_EHTTPMethodGET, szURL);
-		SteamWorks_SetHTTPCallbacks(req, OnRequestComplete);
-		SteamWorks_SetHTTPRequestHeaderValue(req, "User-Agent", "Test");
-		SteamWorks_SendHTTPRequest(req);
+	
+		SendMessage(szURL);
+
 		iVK[iClient]++;
 		CPrintToChat(iClient, "{yellow}>>{default} Отправлено в беседу сервера VK!");
 		if (g_logging.BoolValue)
@@ -249,16 +283,57 @@ public Action VKsay(int iClient, int iArgs)
 	return Plugin_Handled;
 }
 
-public int OnRequestComplete(Handle hRequest, bool bFailure, bool bRequestSuccessful, EHTTPStatusCode eStatusCode)
+void SendMessage(const char[] szURL)
+{
+	if (STEAMWORKS_ON())
+	{
+		SW_SendMessage(szURL);
+	} else if (RIP_ON())
+	{
+		RIP_SendMessage(szURL);
+	} else
+	{
+		LogError("Ошибка отправки сообщения!");
+	}
+}
+
+#if defined _ripext_included_
+void RIP_SendMessage(const char[] szURL)
+{
+	g_hHTTPClient.SetHeader("User-Agent", "Test");
+
+	g_hHTTPClient.Get(szURL[19], OnRequestCompleteRIP);
+}
+
+public void OnRequestCompleteRIP(HTTPResponse hResponse, any iData)
+{
+	if (hResponse.Status != HTTPStatus_OK)
+	{
+		LogMessage("Отклик VK : %d", hResponse.Status);
+	}
+}
+#endif
+
+#if defined _SteamWorks_Included
+void SW_SendMessage(const char[] szURL)
+{
+	Handle hRequest = SteamWorks_CreateHTTPRequest(k_EHTTPMethodGET, szURL);
+	SteamWorks_SetHTTPCallbacks(hRequest, OnRequestCompleteSW);
+	SteamWorks_SetHTTPRequestHeaderValue(hRequest, "User-Agent", "Test");
+	SteamWorks_SendHTTPRequest(hRequest);
+}
+
+public void OnRequestCompleteSW(Handle hRequest, bool bFailure, bool bRequestSuccessful, EHTTPStatusCode eStatusCode)
 {
 	int length;
 	SteamWorks_GetHTTPResponseBodySize(hRequest, length);
 	char[] sBody = new char[length];
 	SteamWorks_GetHTTPResponseBodyData(hRequest, sBody, length);
-	//Дебаг :
-	//PrintToConsoleAll(sBody);
+	delete hRequest;
+
 	if (g_logging.BoolValue)
 	{
 		LogMessage("Отклик VK : %s",sBody);
 	}
 }
+#endif
