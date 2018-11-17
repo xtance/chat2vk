@@ -323,7 +323,7 @@ void SW_SendMessage(const char[] szURL)
 	SteamWorks_SendHTTPRequest(hRequest);
 }
 
-public void OnRequestCompleteSW(Handle hRequest, bool bFailure, bool bRequestSuccessful, EHTTPStatusCode eStatusCode)
+public int OnRequestCompleteSW(Handle hRequest, bool bFailure, bool bRequestSuccessful, EHTTPStatusCode eStatusCode)
 {
 	int length;
 	SteamWorks_GetHTTPResponseBodySize(hRequest, length);
