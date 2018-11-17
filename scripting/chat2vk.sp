@@ -167,6 +167,7 @@ public Action VKsend(int iClient, int iArgs)
 			ReplaceString(szURL, sizeof(szURL), "#", "%23");
 			ReplaceString(szURL, sizeof(szURL), "+", "%2B");
 			
+			SendMessage(szURL);
 			
 			return Plugin_Handled;
 		}
@@ -264,17 +265,7 @@ public Action VKsay(int iClient, int iArgs)
 		//Дебаг :
 		//PrintToConsole(iClient,szURL);
 	
-		if (STEAMWORKS_ON())
-		{
-			SW_SendMessage(szURL);
-		} else if (RIP_ON())
-		{
-			RIP_SendMessage(szURL);
-		} else
-		{
-			LogError("Ошибка отправки сообщения!");
-		}
-		
+		SendMessage(szURL);
 
 		iVK[iClient]++;
 		CPrintToChat(iClient, "{yellow}>>{default} Отправлено в беседу сервера VK!");
@@ -292,6 +283,19 @@ public Action VKsay(int iClient, int iArgs)
 	return Plugin_Handled;
 }
 
+void SendMessage(const char[] szURL)
+{
+	if (STEAMWORKS_ON())
+	{
+		SW_SendMessage(szURL);
+	} else if (RIP_ON())
+	{
+		RIP_SendMessage(szURL);
+	} else
+	{
+		LogError("Ошибка отправки сообщения!");
+	}
+}
 
 #if defined _ripext_included_
 void RIP_SendMessage(const char[] szURL)
