@@ -1,9 +1,9 @@
 ## chat2vk
 Позволяет отправлять сообщение в чат ВКонтакте прямо из сервера. 
 ### !vk любой текст
-Плагин тестировался только для CS:GO, требует SteamWorks : http://users.alliedmods.net/~kyles/builds/SteamWorks/
+Плагин тестировался только для CS:GO, требует SteamWorks : http://users.alliedmods.net/~kyles/builds/SteamWorks/ или Rest in PAWN : https://forums.alliedmods.net/showthread.php?t=298024
 
-Для компилирования нужно кинуть в /scripting/include следующие INC : [SourceComms](https://github.com/sbpp/sourcebans-pp/tree/v1.x/game/addons/sourcemod/scripting/include), [ColorVariables](https://github.com/PremyslTalich/ColorVariables/blob/master/addons/sourcemod/scripting/includes/colorvariables.inc), [Autoexecconfig](https://github.com/Impact123/AutoExecConfig/blob/development/autoexecconfig.inc), [SW](https://github.com/KyleSanderson/SteamWorks/blob/master/Pawn/includes/SteamWorks.inc)
+Для компилирования нужно кинуть в /scripting/include следующие INC : [SourceComms](https://github.com/sbpp/sourcebans-pp/tree/v1.x/game/addons/sourcemod/scripting/include), [ColorVariables](https://github.com/PremyslTalich/ColorVariables/blob/master/addons/sourcemod/scripting/includes/colorvariables.inc), [Autoexecconfig](https://github.com/Impact123/AutoExecConfig/blob/development/autoexecconfig.inc), [SW](https://github.com/KyleSanderson/SteamWorks/blob/master/Pawn/includes/SteamWorks.inc) , [RIP](https://forums.alliedmods.net/showthread.php?t=298024)
  
 ## Как пользоваться плагином Chat2VK :
 0) Кинуть chat2vk.smx в csgo/addons/sourcemod/plugins и запустить его (для генерации конфига)
