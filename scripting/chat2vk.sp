@@ -137,7 +137,6 @@ public Action VKsend(int iClient, int iArgs)
 	{
 		char szTextFromVK[400], szTipaBuffer[2][400];
 		GetCmdArgString(szTextFromVK, sizeof(szTextFromVK));
-		LogMessage("GetCmdArgString = '%s'", szTextFromVK);
 		ReplaceString(szTextFromVK, sizeof(szTextFromVK), "\"", "", false);
 		ExplodeString(szTextFromVK, "&", szTipaBuffer, sizeof(szTipaBuffer), sizeof(szTipaBuffer[]));
 		
@@ -162,14 +161,12 @@ public Action VKsend(int iClient, int iArgs)
 			{
 				FormatEx(szURL, sizeof(szURL), "https://api.vk.com/method/messages.send?chat_id=1&message=Онлайн : %i игроков. Карта : %s^:-^:-%s&v=5.80&access_token=%s",iC,szMap[2],szName,szToken);
 			}
-			
-			LogMessage("szURL = '%s'", szURL);
+
 			ReplaceString(szURL, sizeof(szURL), " ", "%20");
 			ReplaceString(szURL, sizeof(szURL), "^:-", "%0A");
 			ReplaceString(szURL, sizeof(szURL), "#", "%23");
 			ReplaceString(szURL, sizeof(szURL), "+", "%2B");
-			LogMessage("szURL = '%s'", szURL);
-			
+
 			SendMessage(szURL);
 			
 			return Plugin_Handled;
