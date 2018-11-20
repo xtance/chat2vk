@@ -36,7 +36,7 @@ public Plugin myinfo =
 	name = "Chat 2 VK",
 	author = "XTANCE",
 	description = "Send messages to VK conversation",
-	version = "1",
+	version = "1.1",
 	url = "https://t.me/xtance"
 };
 
@@ -76,23 +76,22 @@ public void OnPluginStart()
 		}
 	}
 }
+
 public APLRes AskPluginLoad2(Handle hMySelf, bool bLate, char[] szError, int iErr_max)
 {
 #if defined _SteamWorks_Included
 	MarkNativeAsOptional("SteamWorks_CreateHTTPRequest");
-	MarkNativeAsOptional("SteamWorks_SetHTTPRequestRawPostBody");
 	MarkNativeAsOptional("SteamWorks_SetHTTPCallbacks");
-	MarkNativeAsOptional("SteamWorks_WriteHTTPResponseBodyToFile");
+	MarkNativeAsOptional("SteamWorks_SetHTTPRequestHeaderValue");
 	MarkNativeAsOptional("SteamWorks_SendHTTPRequest");
+	MarkNativeAsOptional("SteamWorks_GetHTTPResponseBodySize");
+	MarkNativeAsOptional("SteamWorks_GetHTTPResponseBodyData");
 #endif
 #if defined _ripext_included_
 	MarkNativeAsOptional("HTTPClient.HTTPClient");
 	MarkNativeAsOptional("HTTPClient.SetHeader");
 	MarkNativeAsOptional("HTTPClient.Post");
-	MarkNativeAsOptional("HTTPResponse.Data.get");
 	MarkNativeAsOptional("HTTPResponse.Status.get");
-	MarkNativeAsOptional("JSONObject.JSONObject");
-	MarkNativeAsOptional("JSONObject.SetString");
 #endif
 	return APLRes_Success;
 }
@@ -128,6 +127,7 @@ public void OnConfigsExecuted()
 
 public Action VKsend(int iClient, int iArgs)
 {
+	LogMessage("VKsend (%d)", iArgs);
 	if ((iArgs < 1) || (iClient > 0))
 	{
 		PrintToServer("[Chat2VK] %N зачем-то написал /send", iClient);
@@ -137,6 +137,7 @@ public Action VKsend(int iClient, int iArgs)
 	{
 		char szTextFromVK[400], szTipaBuffer[2][400];
 		GetCmdArgString(szTextFromVK, sizeof(szTextFromVK));
+		LogMessage("GetCmdArgString = '%s'", szTextFromVK);
 		ReplaceString(szTextFromVK, sizeof(szTextFromVK), "\"", "", false);
 		ExplodeString(szTextFromVK, "&", szTipaBuffer, sizeof(szTipaBuffer), sizeof(szTipaBuffer[]));
 		
@@ -161,11 +162,13 @@ public Action VKsend(int iClient, int iArgs)
 			{
 				FormatEx(szURL, sizeof(szURL), "https://api.vk.com/method/messages.send?chat_id=1&message=Онлайн : %i игроков. Карта : %s^:-^:-%s&v=5.80&access_token=%s",iC,szMap[2],szName,szToken);
 			}
+			
+			LogMessage("szURL = '%s'", szURL);
 			ReplaceString(szURL, sizeof(szURL), " ", "%20");
-			ReplaceString(szURL, sizeof(szURL), "^", "%5E");
-			ReplaceString(szURL, sizeof(szURL), ":", "%3A");
+			ReplaceString(szURL, sizeof(szURL), "^:-", "%0A");
 			ReplaceString(szURL, sizeof(szURL), "#", "%23");
 			ReplaceString(szURL, sizeof(szURL), "+", "%2B");
+			LogMessage("szURL = '%s'", szURL);
 			
 			SendMessage(szURL);
 			
