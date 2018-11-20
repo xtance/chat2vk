@@ -127,7 +127,6 @@ public void OnConfigsExecuted()
 
 public Action VKsend(int iClient, int iArgs)
 {
-	LogMessage("VKsend (%d)", iArgs);
 	if ((iArgs < 1) || (iClient > 0))
 	{
 		PrintToServer("[Chat2VK] %N зачем-то написал /send", iClient);
