@@ -90,7 +90,7 @@ public APLRes AskPluginLoad2(Handle hMySelf, bool bLate, char[] szError, int iEr
 #if defined _ripext_included_
 	MarkNativeAsOptional("HTTPClient.HTTPClient");
 	MarkNativeAsOptional("HTTPClient.SetHeader");
-	MarkNativeAsOptional("HTTPClient.Post");
+	MarkNativeAsOptional("HTTPClient.Get");
 	MarkNativeAsOptional("HTTPResponse.Status.get");
 #endif
 	return APLRes_Success;
