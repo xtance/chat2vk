@@ -41,13 +41,16 @@ public Plugin myinfo =
 };
 
 #if defined _ripext_included_
-HTTPClient g_hHTTPClient ;
+HTTPClient g_hHTTPClient;
 #endif
 	
 public void OnPluginStart()
 {
 	#if defined _ripext_included_
-	g_hHTTPClient = new HTTPClient("https://api.vk.com");
+	if (RIP_ON())
+	{
+		g_hHTTPClient = new HTTPClient("https://api.vk.com");
+	}
 	#endif
 
 	AutoExecConfig_SetFile("chat2vk", "sourcemod");
