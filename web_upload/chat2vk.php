@@ -1,85 +1,89 @@
 <?php
 
-// Код отсюда : https://habr.com/post/329150/ и https://fremnet.net/article/199/source-rcon-class
-// Адаптировано под плагин Chat2VK : https://hlmod.ru/threads/chat-2-vkontakte.46248/ , XTANCE : https://steamcommunity.com/id/xtance
-// Пожалуйста, заполните настройки :
+error_reporting(E_ALL);
+ini_set('log_errors', 'on');
+ini_set('display_errors', 0);
 
-$confirmationToken = 'подтверждение'; 	// Строка для подтверждения адреса сервера из настроек Callback API
-$token = 'токенчик';	// Ключ доступа сообщества (токен)
+$currentPath = __DIR__.DIRECTORY_SEPARATOR;
+ini_set('error_log', $currentPath.'php_errors.log');
 
-$cmd1	= '1'; 						// Команда для отправки на первый сервер
-$ip1	= 'айпишник'; 			// Айпи первого сервера
-$port1	= 'порт'; 					// Порт первого сервера
-$pass1	= 'пароль'; 		//Ркон первого сервера
-
-//Хочу ещё серверов!
-$cmd2	= '2';
-$ip2	= 'айпишник';
-$port2	= 'порт';
-$pass2	= 'пароль';
-$cmd3	= '3';
-$ip3	= 'айпишник';
-$port3	= 'порт';
-$pass3	= 'пароль';
-$cmd4	= '4';
-$ip4	= 'айпишник';
-$port4	= 'порт';
-$pass4	= 'пароль';
-$cmd5	= '5';
-$ip5	= 'айпишник';
-$port5	= 'порт';
-$pass5	= 'пароль';
-
-//Не забудь закрыть возможность добавления бота в беседы
-
-
-
-$data = json_decode(file_get_contents('php://input'));
-if (!isset($_REQUEST)) {
-	return;
+if (!isset($_REQUEST)) { 
+	return; 
 }
 
+define('DEBUG', false); // true Для включения режима отладки
+
+$confirmationToken = ''; 	// Строка для подтверждения адреса сервера из настроек Callback API
+$token = '';	// Ключ доступа сообщества (токен)
+
+$servers = [
+	'1' => [			// Команда для отправки на первый сервер (может быть даже словом, главное без пробелов)
+		'ip' => '', // Ип сервера
+		'port' => '', // Порт сервера
+		'pass' => '', // Ркон пароль сервера
+	],
+];
+
+$date = date('Y-m-d');
+$logPath = $currentPath.'messages_'.$date.'.log';
+$debugLogPath = $currentPath.'debug_'.$date.'.log';
+
+function debugMessage($title, $data) {
+	global $debugLogPath;
+	if (DEBUG) {
+		file_put_contents($debugLogPath, $title.':'.print_r($data, true).PHP_EOL, FILE_APPEND);
+	}
+}
+$data = json_decode(file_get_contents('php://input'));
+debugMessage('REQUEST', $data);
+
 switch ($data->type) {
-	
     case 'confirmation':
         echo $confirmationToken;
         break;
 
     case 'message_new':
-		echo('ok');
+		echo 'ok';
 		$convcheck = $data->object->id;
-		if ('0' == $convcheck) // Чтобы челик не мог написать боту в лс
-		{
-			include_once("rcon.class.php");
-			$message = $data->object->text;
-			
-			// Кривой код. Написано плохо.
-			// Кто-нибудь, помогите!
-			if(strpos($message, $cmd1) === 0) {
-				$r = new rcon($ip1,$port1,$pass1);
-			}
-			else if(strpos($message, $cmd2) === 0) {
-				$r = new rcon($ip2,$port2,$pass2);
-			}
-			else if(strpos($message, $cmd3) === 0) {
-				$r = new rcon($ip3,$port3,$pass3);
-			}
-			else if(strpos($message, $cmd4) === 0) {
-				$r = new rcon($ip4,$port4,$pass4);
-			}
-			else if(strpos($message, $cmd5) === 0) {
-				$r = new rcon($ip5,$port5,$pass5);
-			}
-			else { break; }
-			
-			$r->Auth();
-			$userId = $data->object->from_id;
-			$userInfo = json_decode(file_get_contents("https://api.vk.com/method/users.get?user_ids={$userId}&v=5.87&access_token={$token}"));
-			$user_name = $userInfo->response[0]->first_name;
-			$last_name = $userInfo->response[0]->last_name;
-			$message = substr($message, strlen($cmd1));
-			$r->sendCommand("sm_send $user_name $last_name&$message");
+		if ('0' != $convcheck) {	// Чтобы челик не мог написать боту в лс
+			return;
 		}
+
+		$message = $data->object->text;
+		$result = preg_match("#^\!(\S*)\s(.*)$#", $message, $matches);
+		debugMessage('result', $result);
+		debugMessage('matches', $matches);
+
+		if ($result === false || count($matches) != 3) {
+			return;
+		}
+
+		if (!array_key_exists($matches[1], $servers)) {
+			return;
+		}
+
+		$userId = $data->object->from_id;
+		$userInfo = json_decode(file_get_contents("https://api.vk.com/method/users.get?user_ids={$userId}&v=5.87&access_token={$token}"));
+		debugMessage('userInfo', $userInfo);
+
+		if (!$userInfo) {
+			return;
+		}
+
+		$user_name = $userInfo->response[0]->first_name;
+		$last_name = $userInfo->response[0]->last_name;
+
+
+		include_once("rcon.class.php");
+		$serverData = $servers[$matches[1]];
+		$r = new rcon($serverData['ip'],$serverData['port'],$serverData['pass']);
+		$r->Auth();
+
+		$message = $matches[2];
+		$r->sendCommand("sm_send $user_name $last_name&$message");
+
+		$logMsg = date('Y-m-d H:i:s').' '.$user_name.' '.$last_name.': '.$message;
+		file_put_contents($logPath, $logMsg.PHP_EOL, FILE_APPEND);
+
 		break;
 }
-?>
