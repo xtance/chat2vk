@@ -34,7 +34,7 @@ class RCon {
 
 		// Real response (id: -1 = failure)
 		$ret = $this->_PacketRead();
-		if ($ret[1]['id'] == -1) {
+		if ($ret[1]['ID'] == -1) {
 			die("Authentication Failure\n");
 		}
 	}
