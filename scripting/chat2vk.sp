@@ -143,31 +143,33 @@ public Action VKsend(int iClient, int iArgs)
 		ExplodeString(szTextFromVK, "&", szTipaBuffer, sizeof(szTipaBuffer), sizeof(szTipaBuffer[]));
 		
 		if (strlen(szTipaBuffer[1]) < 1){
-			char szURL[1024], szName[2048], szRawMap[64], szMap[3][64];
+			char szURL[1024], szName[2048], szRawMap[PLATFORM_MAX_PATH];
 			int iC = 0;
 			for (int i = 1; i <= MaxClients; i++)
 			{
 				if (IsClientInGame(i) && !IsFakeClient(i))
 				{
 					Format(szName, sizeof(szName), "%s%N ^:-", szName,i);
+					ReplaceString(szName, sizeof(szName), "&", "");
 					iC++;
 				}
 			}
 			GetCurrentMap(szRawMap, sizeof(szRawMap));
-			ExplodeString(szRawMap, "/", szMap, sizeof(szMap), sizeof(szMap[]));
+			GetMapDisplayName(szRawMap, szRawMap, sizeof(szRawMap));
 			if (g_servername.BoolValue)
 			{
-				FormatEx(szURL, sizeof(szURL), "https://api.vk.com/method/messages.send?chat_id=1&message=Сервер : %s^:-Онлайн : %i игроков. Карта : %s^:-^:-%s&v=5.80&access_token=%s",szSName,iC,szMap[2],szName,szToken);
+				FormatEx(szURL, sizeof(szURL), "https://api.vk.com/method/messages.send?chat_id=1&message=Сервер : %s^:-Онлайн : %i игроков. Карта : %s^:-^:-%s&v=5.80&access_token=%s",szSName,iC,szRawMap,szName,szToken);
 			}
 			else
 			{
-				FormatEx(szURL, sizeof(szURL), "https://api.vk.com/method/messages.send?chat_id=1&message=Онлайн : %i игроков. Карта : %s^:-^:-%s&v=5.80&access_token=%s",iC,szMap[2],szName,szToken);
+				FormatEx(szURL, sizeof(szURL), "https://api.vk.com/method/messages.send?chat_id=1&message=Онлайн : %i игроков. Карта : %s^:-^:-%s&v=5.80&access_token=%s",iC,szRawMap,szName,szToken);
 			}
 
 			ReplaceString(szURL, sizeof(szURL), " ", "%20");
 			ReplaceString(szURL, sizeof(szURL), "^:-", "%0A");
 			ReplaceString(szURL, sizeof(szURL), "#", "%23");
 			ReplaceString(szURL, sizeof(szURL), "+", "%2B");
+
 
 			SendMessage(szURL);
 			
