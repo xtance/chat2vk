@@ -12,6 +12,7 @@ $confirmationToken = ''; 	// Строка для подтверждения ад
 $token = '';	// Ключ доступа сообщества (токен)
 $servers = [
 	'1' => [			// Команда для отправки на первый сервер (может быть даже словом, главное без пробелов)
+					// В беседе обязательно вводить с воскл. знаком!!
 		'ip' => '', // Ип сервера
 		'port' => '', // Порт сервера
 		'pass' => '', // Ркон пароль сервера
@@ -35,13 +36,28 @@ switch ($data->type) {
     case 'message_new':
 		echo 'ok';
 		$convcheck = $data->object->id;
-		if ('0' != $convcheck) {	// Чтобы челик не мог написать боту в лс
+		if ('0' != $convcheck) {
+			// Чтобы челик не мог написать боту в лс
 			return;
 		}
 		$message = $data->object->text;
+		
+		// На случай если игрок захотел проверить онлайн сервера и карту.
+		$x = substr($message, 1);
+		if (array_key_exists($x, $servers)) {
+			include_once("rcon.class.php");
+			$serverData = $servers[$x];
+			$r = new rcon($serverData['ip'],$serverData['port'],$serverData['pass']);
+			$r->Auth();
+			$r->sendCommand("sm_send status&");
+			return;
+		}
+		
 		$result = preg_match("#^\!(\S*)\s(.*)$#", $message, $matches);
 		debugMessage('result', $result);
 		debugMessage('matches', $matches);
+		// Альтернативный метод тестирования с выводом прямо в беседу
+		// file_get_contents("https://api.vk.com/method/messages.send?chat_id=1&message={$matches}&v=5.87&access_token={$token}");
 		if ($result === false || count($matches) != 3) {
 			return;
 		}
@@ -62,7 +78,7 @@ switch ($data->type) {
 		$r->Auth();
 		$message = $matches[2];
 		$r->sendCommand("sm_send $user_name $last_name&$message");
-		$logMsg = date('Y-m-d H:i:s').' '.$user_name.' '.$last_name.': '.$message;
-		file_put_contents($logPath, $logMsg.PHP_EOL, FILE_APPEND);
+		// $logMsg = date('Y-m-d H:i:s').' '.$user_name.' '.$last_name.': '.$message;
+		// file_put_contents($logPath, $logMsg.PHP_EOL, FILE_APPEND);
 		break;
 }
