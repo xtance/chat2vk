@@ -287,25 +287,32 @@ public Action VKsay(int iClient, int iArgs)
 
 void SendMessage(const char[] szURL)
 {
+	#if defined _SteamWorks_Included
 	if (STEAMWORKS_ON())
 	{
-		SW_SendMessage(szURL);
-	} else if (RIP_ON())
-	{
-		RIP_SendMessage(szURL);
-	} else
-	{
-		LogError("Ошибка отправки сообщения!");
+		Handle hRequest = SteamWorks_CreateHTTPRequest(k_EHTTPMethodGET, szURL);
+		SteamWorks_SetHTTPCallbacks(hRequest, OnRequestCompleteSW);
+		SteamWorks_SetHTTPRequestHeaderValue(hRequest, "User-Agent", "Test");
+		SteamWorks_SendHTTPRequest(hRequest);
+		return;
 	}
+	#endif
+	
+	#if defined _ripext_included_
+	if (RIP_ON())
+	{
+		g_hHTTPClient.SetHeader("User-Agent", "Test");
+
+		g_hHTTPClient.Get(szURL[19], OnRequestCompleteRIP);
+	
+		return;
+	}
+	#endif
+	
+	LogError("Ошибка отправки сообщения!");
 }
 
 #if defined _ripext_included_
-void RIP_SendMessage(const char[] szURL)
-{
-	g_hHTTPClient.SetHeader("User-Agent", "Test");
-
-	g_hHTTPClient.Get(szURL[19], OnRequestCompleteRIP);
-}
 
 public void OnRequestCompleteRIP(HTTPResponse hResponse, any iData)
 {
@@ -317,13 +324,6 @@ public void OnRequestCompleteRIP(HTTPResponse hResponse, any iData)
 #endif
 
 #if defined _SteamWorks_Included
-void SW_SendMessage(const char[] szURL)
-{
-	Handle hRequest = SteamWorks_CreateHTTPRequest(k_EHTTPMethodGET, szURL);
-	SteamWorks_SetHTTPCallbacks(hRequest, OnRequestCompleteSW);
-	SteamWorks_SetHTTPRequestHeaderValue(hRequest, "User-Agent", "Test");
-	SteamWorks_SendHTTPRequest(hRequest);
-}
 
 public void OnRequestCompleteSW(Handle hRequest, bool bFailure, bool bRequestSuccessful, EHTTPStatusCode eStatusCode)
 {
