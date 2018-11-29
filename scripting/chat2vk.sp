@@ -1,6 +1,5 @@
 #include <sourcemod>
 #include <cstrike>
-#include <colorvariables>
 #include <autoexecconfig>
 
 #undef REQUIRE_PLUGIN
@@ -56,7 +55,7 @@ public void OnPluginStart()
 	AutoExecConfig_SetFile("chat2vk", "sourcemod");
 	AutoExecConfig_SetCreateFile(true);
 	g_sourcecomms = CreateConVar("g_sourcecomms", "0", "SourceComms Support : 1=ON, 0=OFF");
-	g_token = AutoExecConfig_CreateConVar("g_token", "thisisyourtoken", "Токен от группы VK. Подробнее : https://pastebin.com/YQ2dwGWY");
+	g_token = AutoExecConfig_CreateConVar("g_token", "thisisyourtoken", "Токен от группы VK. Подробнее : https://hlmod.ru/resources/chat-2-vkontakte.959/");
 	g_msgPerRound = AutoExecConfig_CreateConVar("g_msgPerRound", "3", "Сколько сообщений в раунд можно отправить.");
 	g_servername = AutoExecConfig_CreateConVar("g_servername", "1", "Указывать название сервера в сообщении.");
 	g_logging = AutoExecConfig_CreateConVar("g_logging", "1", "Писать логи в csgo/addons/sourcemod/logs");
@@ -64,7 +63,7 @@ public void OnPluginStart()
 	g_link = AutoExecConfig_CreateConVar("g_link", "1", "Вставлять ссылку на игрока вместо его SteamID в сообщении.");
 	AutoExecConfig_ExecuteFile();
 	RegConsoleCmd("sm_vk", VKsay, "Send a message to VK conversation");
-	RegConsoleCmd("sm_send", VKsend, "Command to send message from VK to server, don't touch it!");
+	RegServerCmd("sm_send", VKsend, "Command to send message from VK to server, don't touch it!");
 	HookEvent("round_start", RoundStart, EventHookMode_Post);
 	
 	CreateDirectory("addons/sourcemod/data/chat2vk",511);
@@ -128,11 +127,11 @@ public void OnConfigsExecuted()
 	
 }
 
-public Action VKsend(int iClient, int iArgs)
+public Action VKsend(int iArgs)
 {
-	if ((iArgs < 1) || (iClient > 0))
+	if (iArgs < 1)
 	{
-		PrintToServer("[Chat2VK] %N зачем-то написал /send", iClient);
+		PrintToServer("[Chat2VK] Что-то пошло не так!");
 		return Plugin_Handled;
 	}
 	else
@@ -176,12 +175,12 @@ public Action VKsend(int iClient, int iArgs)
 			return Plugin_Handled;
 		}
 		
-		CPrintToChatAll("{darkblue}>>{default} %s {darkblue}пишет из VK :", szTipaBuffer[0]);
-		CPrintToChatAll( "{darkblue}>>{default} %s " , szTipaBuffer[1] );
+		PrintToChatAll(" \x0B>>\x01 %s \x0Bпишет из VK :", szTipaBuffer[0]);
+		PrintToChatAll( " \x0B>>\x01 %s " , szTipaBuffer[1] );
 		
 		if (g_logging.BoolValue)
 		{
-			LogAction(iClient, -1, "%s пишет из VK : %s", szTipaBuffer[0],szTipaBuffer[1]);
+			LogMessage("%s пишет из VK : %s", szTipaBuffer[0],szTipaBuffer[1]);
 		}
 		return Plugin_Handled;
 	}
@@ -189,9 +188,29 @@ public Action VKsend(int iClient, int iArgs)
 
 public Action VKsay(int iClient, int iArgs)
 {
+	if (iClient == 0)
+	{
+		char szURL[1024],szText[256];
+		GetCmdArgString(szText, sizeof(szText));
+		if (g_servername.BoolValue)
+		{
+			FormatEx(szURL, sizeof(szURL), "https://api.vk.com/method/messages.send?chat_id=1&message=Консоль пишет :NEWLINE NEWLINE%s NEWLINE NEWLINEСервер : %s&v=5.80&access_token=%s",szText,szSName,szToken);
+		}
+		else
+		{
+			FormatEx(szURL, sizeof(szURL), "https://api.vk.com/method/messages.send?chat_id=1&message=Консоль пишет :NEWLINE NEWLINE%s&v=5.80&access_token=%s",szText,szToken);
+		}
+		//Костыли :
+		ReplaceString(szURL, sizeof(szURL), " ", "%20", false);
+		ReplaceString(szURL, sizeof(szURL), "NEWLINE", "%0A", false);
+		ReplaceString(szURL, sizeof(szURL), "#", "%23", false);
+		SendMessage(szURL);
+		return Plugin_Handled;
+	}
+	
 	if(iArgs < 1)
 	{
-		CPrintToChat(iClient,"{green}>>{default} Использование команды : {green}/vk текст!");
+		PrintToChat(iClient," \x06>>\x01 Использование команды : \x06/vk текст!");
 		return Plugin_Handled;
 	}
 	
@@ -218,7 +237,7 @@ public Action VKsay(int iClient, int iArgs)
 			if ((StrContains(szLine, szText, false) != -1) || (StrContains(szText, szLine, false) != -1))
 			{
 				PrintToConsoleAll("Нельзя : %s",szLine);
-				CPrintToChat(iClient, "{darkred}>>{default} Запрещённое сообщение! :<");
+				PrintToChat(iClient, " \x02>>\x01 Запрещённое сообщение! :<");
 				if (g_logging.BoolValue)
 				{
 					LogAction(iClient, -1, "\"%L\" пытался отправить : %s, запрет на : %s", iClient, szText, szLine);
@@ -235,7 +254,7 @@ public Action VKsay(int iClient, int iArgs)
 		//Проверка SourceComms
 		if ((g_sourcecomms.BoolValue) && (SourceComms_GetClientGagType(iClient) != bNot))
 		{
-			CPrintToChat(iClient, "{darkred}>>{default} Тебе отключили чатик! :<");
+			PrintToChat(iClient, " \x02>>\x01 Тебе отключили чатик! :<");
 			return Plugin_Handled;
 		}
 		char szURL[1024];
@@ -259,11 +278,9 @@ public Action VKsay(int iClient, int iArgs)
 			FormatEx(szURL, sizeof(szURL), "https://api.vk.com/method/messages.send?chat_id=1&message=Игрок \"%N\" (%s) пишет :NEWLINE NEWLINE%s&v=5.80&access_token=%s",iClient,szSteam,szText,szToken);
 		}
 		
-		//Костыль :
+		//Костыли :
 		ReplaceString(szURL, sizeof(szURL), " ", "%20", false);
 		ReplaceString(szURL, sizeof(szURL), "NEWLINE", "%0A", false);
-		
-		//Решётки сломают вам запрос в вк, придётся их удалить :
 		ReplaceString(szURL, sizeof(szURL), "#", "%23", false);
 		
 		//Дебаг :
@@ -272,7 +289,7 @@ public Action VKsay(int iClient, int iArgs)
 		SendMessage(szURL);
 
 		iVK[iClient]++;
-		CPrintToChat(iClient, "{yellow}>>{default} Отправлено в беседу сервера VK!");
+		PrintToChat(iClient, " \x0B>> \x01 Отправлено в беседу сервера VK!");
 		if (g_logging.BoolValue)
 		{
 			LogAction(iClient, -1, "\"%L\" отправил : %s", iClient, szURL);
@@ -281,8 +298,8 @@ public Action VKsay(int iClient, int iArgs)
 	else
 	{
 		char szOutOfLimits[128];
-		Format(szOutOfLimits, sizeof(szOutOfLimits),"{darkred}>>{default} Можно писать в VK %i раз в раунд!",iMsgPerRound);
-		CPrintToChat(iClient, szOutOfLimits);
+		Format(szOutOfLimits, sizeof(szOutOfLimits)," \x02>>\x01 Можно писать в VK %i раз в раунд!",iMsgPerRound);
+		PrintToChat(iClient, szOutOfLimits);
 	}
 	return Plugin_Handled;
 }
