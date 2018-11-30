@@ -42,26 +42,25 @@ switch ($data->type) {
 		}
 		$message = $data->object->text;
 		
+		$result = preg_match("#^\!(\S*)\s?(.+)?$#", $message, $matches);
+		debugMessage('result', $result);
+		debugMessage('matches', $matches);
+		// Альтернативный метод тестирования с выводом прямо в беседу
+		// file_get_contents("https://api.vk.com/method/messages.send?chat_id=1&message={$matches}&v=5.87&access_token={$token}");
+		if ($result === false || count($matches) < 2) {
+			return;
+		}
+		if (!array_key_exists($matches[1], $servers)) {
+			return;
+		}
+		
 		// На случай если игрок захотел проверить онлайн сервера и карту.
-		$x = substr($message, 1);
-		if (array_key_exists($x, $servers)) {
+		if(count($matches) == 2) {
 			include_once("rcon.class.php");
 			$serverData = $servers[$x];
 			$r = new rcon($serverData['ip'],$serverData['port'],$serverData['pass']);
 			$r->Auth();
 			$r->sendCommand("sm_send status&");
-			return;
-		}
-		
-		$result = preg_match("#^\!(\S*)\s(.*)$#", $message, $matches);
-		debugMessage('result', $result);
-		debugMessage('matches', $matches);
-		// Альтернативный метод тестирования с выводом прямо в беседу
-		// file_get_contents("https://api.vk.com/method/messages.send?chat_id=1&message={$matches}&v=5.87&access_token={$token}");
-		if ($result === false || count($matches) != 3) {
-			return;
-		}
-		if (!array_key_exists($matches[1], $servers)) {
 			return;
 		}
 		$userId = $data->object->from_id;
