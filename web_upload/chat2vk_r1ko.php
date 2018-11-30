@@ -7,7 +7,14 @@ ini_set('error_log', $currentPath.'php_errors.log');
 if (!isset($_REQUEST)) { 
 	return; 
 }
-define('DEBUG', false); // true Для включения режима отладки
+
+/* Настройки Chat2VK */
+
+define('DEBUG', false); 				// true/false : включить/выключить режим отладки
+define('CONSOLE', true); 				// true/false : включить/выключить поддержку sm_rcon. Пример использования : !1 sm_rcon bot_kick
+$ids = array("1","2","3");		// Укажите нужные VK ID в цифрах : 142805811, а не xtance.
+					// Осторожно : пользователь сможет исполнять любые ркон команды!
+
 $confirmationToken = ''; 	// Строка для подтверждения адреса сервера из настроек Callback API
 $token = '';	// Ключ доступа сообщества (токен)
 $servers = [
@@ -18,6 +25,10 @@ $servers = [
 		'pass' => '', // Ркон пароль сервера
 	],
 ];
+
+
+// Тоже настройки, но менять тут нечего :
+$chat = '1';
 $date = date('Y-m-d');
 $logPath = $currentPath.'messages_'.$date.'.log';
 $debugLogPath = $currentPath.'debug_'.$date.'.log';
@@ -54,16 +65,36 @@ switch ($data->type) {
 			return;
 		}
 		
-		// На случай если игрок захотел проверить онлайн сервера и карту.
+		// Авторизация через rcon
+		include_once("rcon.class.php");
+		$serverData = $servers[$matches[1]];
+		$r = new rcon($serverData['ip'],$serverData['port'],$serverData['pass']);
+		$r->Auth();
+		
+		// На случай если игрок захотел проверить онлайн сервера и карту
 		if(count($matches) == 2) {
-			include_once("rcon.class.php");
-			$serverData = $servers[$matches[1]];
-			$r = new rcon($serverData['ip'],$serverData['port'],$serverData['pass']);
-			$r->Auth();
 			$r->sendCommand("sm_send status&");
 			return;
 		}
+		
+		//	Получаем ID отправителя
 		$userId = $data->object->from_id;
+		
+		// Ркон из ВК
+		$rcon = 'sm_rcon';
+		if (CONSOLE && (strncmp($matches[2], $rcon, strlen($rcon)) === 0))
+		{
+			if (in_array($userId, $ids))
+			{
+				$r->sendCommand("${matches[2]}");
+			}
+			else
+			{
+				file_get_contents("https://api.vk.com/method/messages.send?chat_id={$chat}&message=@id{$userId}%20(Вы)%20не%20можете%20использовать%20RCON.&v=5.87&access_token={$token}");
+			}
+			return;
+		}
+		
 		$userInfo = json_decode(file_get_contents("https://api.vk.com/method/users.get?user_ids={$userId}&v=5.87&access_token={$token}"));
 		debugMessage('userInfo', $userInfo);
 		if (!$userInfo) {
@@ -71,10 +102,7 @@ switch ($data->type) {
 		}
 		$user_name = $userInfo->response[0]->first_name;
 		$last_name = $userInfo->response[0]->last_name;
-		include_once("rcon.class.php");
-		$serverData = $servers[$matches[1]];
-		$r = new rcon($serverData['ip'],$serverData['port'],$serverData['pass']);
-		$r->Auth();
+		
 		$message = $matches[2];
 		$r->sendCommand("sm_send $user_name $last_name&$message");
 		// $logMsg = date('Y-m-d H:i:s').' '.$user_name.' '.$last_name.': '.$message;
