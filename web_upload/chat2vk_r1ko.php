@@ -57,7 +57,7 @@ switch ($data->type) {
 		// На случай если игрок захотел проверить онлайн сервера и карту.
 		if(count($matches) == 2) {
 			include_once("rcon.class.php");
-			$serverData = $servers[$x];
+			$serverData = $servers[$matches[1]];
 			$r = new rcon($serverData['ip'],$serverData['port'],$serverData['pass']);
 			$r->Auth();
 			$r->sendCommand("sm_send status&");
