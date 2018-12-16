@@ -20,7 +20,7 @@ class RCon {
 	var $_Sock = null;
 	var $_Id = 0;
 
-	function RCon ($Host,$Port,$Password) {
+	function __construct ($Host,$Port,$Password) {
 		$this->Password = $Password;
 		$this->Host = $Host;
 		$this->Port = $Port;
