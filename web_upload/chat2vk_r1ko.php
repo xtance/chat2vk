@@ -12,6 +12,7 @@ if (!isset($_REQUEST)) {
 
 define('DEBUG', false); 				// true/false : включить/выключить режим отладки
 define('CONSOLE', true); 				// true/false : включить/выключить поддержку sm_rcon. Пример использования : !1 sm_rcon bot_kick
+define('ALL', true); 					// true/false : включить/выключить команду !all для беседы вк
 $ids = array("1","2","3");		// Укажите нужные VK ID в цифрах : 142805811, а не xtance.
 					// Осторожно : пользователь сможет исполнять любые ркон команды!
 
