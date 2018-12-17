@@ -42,7 +42,7 @@ $data = json_decode(file_get_contents('php://input'));
 debugMessage('REQUEST', $data);
 switch ($data->type) {
     case 'confirmation':
-        echo $confirmationToken;
+        echo $conf;
         break;
     case 'message_new':
 		echo 'ok';
@@ -59,6 +59,35 @@ switch ($data->type) {
 		// Альтернативный метод тестирования с выводом прямо в беседу
 		// file_get_contents("https://api.vk.com/method/messages.send?chat_id=1&message={$matches}&v=5.87&access_token={$token}");
 		if ($result === false || count($matches) < 2) {
+			return;
+		}
+		$isall = 'all';
+		if (ALL && ($matches[1] === $isall))
+		{
+			include_once("rcon.class.php");
+			$userId = $data->object->from_id;
+			$userInfo = json_decode(file_get_contents("https://api.vk.com/method/users.get?user_ids={$userId}&v=5.87&access_token={$token}"));
+		
+			debugMessage('userInfo', $userInfo);
+			if (!$userInfo) {
+				return;
+			}
+			$user_name = $userInfo->response[0]->first_name;
+			$last_name = $userInfo->response[0]->last_name;
+			
+			foreach ($servers as $key => $value)
+			{
+				$serverData = $servers[$key];
+				$r = new rcon($serverData['ip'],$serverData['port'],$serverData['pass']);
+				$r->Auth();
+				if(count($matches) == 2) {
+					$r->sendCommand("sm_send status&");
+				}
+				else {
+					$message = $matches[2];
+					$r->sendCommand("sm_send $user_name $last_name&$message");
+				}
+			}
 			return;
 		}
 		if (!array_key_exists($matches[1], $servers)) {
@@ -96,6 +125,7 @@ switch ($data->type) {
 		}
 		
 		$userInfo = json_decode(file_get_contents("https://api.vk.com/method/users.get?user_ids={$userId}&v=5.87&access_token={$token}"));
+		
 		debugMessage('userInfo', $userInfo);
 		if (!$userInfo) {
 			return;
