@@ -54,7 +54,7 @@ public void OnPluginStart()
 
 	AutoExecConfig_SetFile("chat2vk", "sourcemod");
 	AutoExecConfig_SetCreateFile(true);
-	g_sourcecomms = CreateConVar("g_sourcecomms", "0", "SourceComms Support : 1=ON, 0=OFF");
+	g_sourcecomms = AutoExecConfig_CreateConVar("g_sourcecomms", "0", "SourceComms Support : 1=ON, 0=OFF");
 	g_token = AutoExecConfig_CreateConVar("g_token", "thisisyourtoken", "Токен от группы VK. Подробнее : https://hlmod.ru/resources/chat-2-vkontakte.959/");
 	g_msgPerRound = AutoExecConfig_CreateConVar("g_msgPerRound", "3", "Сколько сообщений в раунд можно отправить.");
 	g_servername = AutoExecConfig_CreateConVar("g_servername", "1", "Указывать название сервера в сообщении.");
