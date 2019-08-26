@@ -1,10 +1,9 @@
 #include <sourcemod>
 #include <cstrike>
-#include <autoexecconfig>
+#include <ripext>
 
 #undef REQUIRE_PLUGIN
-#include <sourcecomms>
-
+#include <basecomm>
 
 #undef REQUIRE_EXTENSIONS
 #tryinclude <SteamWorks>
@@ -16,67 +15,120 @@
 #pragma semicolon 1
 #pragma newdecls required
 
-ConVar g_sourcecomms;
-ConVar g_token;
-ConVar g_servername;
-ConVar g_msgPerRound;
-ConVar g_logging;
-ConVar g_check;
-ConVar g_link;
+#if defined _ripext_included_
+HTTPClient g_hHTTPClient;
+#endif
 
-int iVK[MAXPLAYERS + 1];
-int iMsgPerRound;
-char szToken[128];
-char szSName[256];
-char szPath[PLATFORM_MAX_PATH];
+int iChats, iCSGO, iIncludeServerName, iBaseComms, iMessagesPerRound, iLogging, iVK[MAXPLAYERS + 1], iSteam[MAXPLAYERS + 1];
+char sToken[128],sServerName[256], sSection[100],sValueID[100], sText[MAXPLAYERS+1][256], sName[MAXPLAYERS+1][64];
+Menu menu_chats;
 
 public Plugin myinfo =
 {
 	name = "Chat 2 VK",
 	author = "XTANCE",
 	description = "Send messages to VK conversation",
-	version = "1.1",
+	version = "2.0",
 	url = "https://t.me/xtance"
 };
 
-#if defined _ripext_included_
-HTTPClient g_hHTTPClient;
-#endif
-	
 public void OnPluginStart()
 {
 	#if defined _ripext_included_
-	if (RIP_ON())
-	{
-		g_hHTTPClient = new HTTPClient("https://api.vk.com");
-	}
+	if (RIP_ON()) g_hHTTPClient = new HTTPClient("https://api.vk.com");
 	#endif
 
-	AutoExecConfig_SetFile("chat2vk", "sourcemod");
-	AutoExecConfig_SetCreateFile(true);
-	g_sourcecomms = AutoExecConfig_CreateConVar("g_sourcecomms", "0", "SourceComms Support : 1=ON, 0=OFF");
-	g_token = AutoExecConfig_CreateConVar("g_token", "thisisyourtoken", "Токен от группы VK. Подробнее : https://hlmod.ru/resources/chat-2-vkontakte.959/");
-	g_msgPerRound = AutoExecConfig_CreateConVar("g_msgPerRound", "3", "Сколько сообщений в раунд можно отправить.");
-	g_servername = AutoExecConfig_CreateConVar("g_servername", "1", "Указывать название сервера в сообщении.");
-	g_logging = AutoExecConfig_CreateConVar("g_logging", "1", "Писать логи в csgo/addons/sourcemod/logs");
-	g_check = AutoExecConfig_CreateConVar("g_check", "0", "[BETA] Запрещает слова из файла addons/sourcemod/data/chat2vk/check.txt \nПрисутствуют баги.");
-	g_link = AutoExecConfig_CreateConVar("g_link", "1", "Вставлять ссылку на игрока вместо его SteamID в сообщении.");
-	AutoExecConfig_ExecuteFile();
-	RegConsoleCmd("sm_vk", VKsay, "Send a message to VK conversation");
-	RegServerCmd("sm_send", VKsend, "Command to send message from VK to server, don't touch it!");
+	
+	RegConsoleCmd("sm_vk", VKsay, "Посылает сообщение в VK");
+	RegServerCmd("sm_send", VKsend, "Посылает сообщение из VK на сервер - не трогать");
+	RegServerCmd("sm_web_getplayers", Action_Web_GetPlayers, "Получает массив с игроками - не трогать");
+	
 	HookEvent("round_start", RoundStart, EventHookMode_Post);
 	
-	CreateDirectory("addons/sourcemod/data/chat2vk",511);
-	BuildPath(Path_SM, szPath, sizeof(szPath), "data/chat2vk/check.txt");
-	if (g_check.BoolValue)
-	{
-		if (!FileExists(szPath))
+	char sPath[PLATFORM_MAX_PATH];
+	BuildPath(Path_SM, sPath, sizeof(sPath), "configs/chat2vk.ini");
+	KeyValues kv = new KeyValues("Chat2VK");
+	
+	if (!FileExists(sPath, false)){
+		if (kv.JumpToKey("VK_Settings", true)){
+			kv.SetNum("BaseComms", 1);
+			kv.SetString("VKToken", "thisisyourtoken");
+			kv.SetNum("MessagesPerRound", 3);
+			kv.SetNum("IncludeServerName", 1);
+			kv.SetNum("Logging", 1);
+			kv.SetNum("CSGO_Colors", 1);
+			kv.Rewind();
+		}
+		if (kv.JumpToKey("VK_Commands", true)){
+			kv.SetString("Отправить в беседу", "2000000001");
+			kv.SetString("Отправить гл. админу", "142805811");
+			kv.Rewind();
+		}
+		kv.ExportToFile(sPath);
+	}
+	
+	if (kv.ImportFromFile(sPath)){
+		if (kv.JumpToKey("VK_Settings", false)){
+			iBaseComms = kv.GetNum("BaseComms");
+			kv.GetString("VKToken", sToken, sizeof(sToken));
+			iMessagesPerRound = kv.GetNum("MessagesPerRound");
+			iIncludeServerName = kv.GetNum("IncludeServerName");
+			iLogging = kv.GetNum("Logging");
+			iCSGO = kv.GetNum("CSGO_Colors");
+			kv.Rewind();
+		}
+		if (kv.JumpToKey("VK_Commands", false)){
+			kv.GotoFirstSubKey(false);
+			menu_chats = new Menu(hmenu);
+			menu_chats.SetTitle("Выберите получателя:");
+			do {
+				kv.GetSectionName(sSection, sizeof(sSection));
+				kv.GetString(NULL_STRING, sValueID, sizeof(sValueID));
+				menu_chats.AddItem(sValueID, sSection);
+				if (iLogging) PrintToServer("[Chat2VK] ChatID: %s, Text: %s", sValueID, sSection);
+				iChats++;
+			} while (kv.GotoNextKey(false));
+		}
+	} else SetFailState("[Chat2VK] KeyValues Error!");
+	delete kv;
+	
+	if (iIncludeServerName){
+		Handle hHostName;
+		if(hHostName == INVALID_HANDLE)
 		{
-			PrintToServer("[Chat2VK] Нет файла для проверки, делаю его сам!");
-			Handle hFile = OpenFile(szPath,"w");
-			CloseHandle(hFile);
+			if( (hHostName = FindConVar("hostname")) == INVALID_HANDLE)
+			{
+				PrintToServer("[Chat2VK] Плагин сломался.");
+				return;
+			}
+		}
+		GetConVarString(hHostName, sServerName, sizeof(sServerName));
+		ReplaceString(sServerName, sizeof(sServerName), " ", "%20", false);
+	}
+	
+	for (int i = 1; i<=MaxClients; i++) OnClientPostAdminCheck(i);
+}
+
+public void OnClientPostAdminCheck(int iClient) {
+	if (IsClientInGame(iClient) && !IsFakeClient(iClient)){
+		iSteam[iClient] = GetSteamAccountID(iClient, true);
+		GetClientName(iClient, sName[iClient], sizeof(sName[]));
+		ReplaceString(sName[iClient], sizeof(sName[]), "\\", "", false);
+		ReplaceString(sName[iClient], sizeof(sName[]), "\"", "", false);
+	}
+}
+
+public Action Action_Web_GetPlayers(int iArgs){
+	char sJson[1512];
+	for (int i = 1; i<=MaxClients; i++){
+		if (IsClientInGame(i) && !IsFakeClient(i)){
+			Format(sJson, sizeof(sJson), "{\"name\": \"%s\", \"steamid\": %i, \"k\": %i, \"d\": %i },%s",sName[i],iSteam[i],GetClientFrags(i),GetClientDeaths(i),sJson);
 		}
 	}
+	Format(sJson, sizeof(sJson), "[%s]", sJson);
+	ReplaceString(sJson, sizeof(sJson), ",]", "]", false); // :D
+	ReplyToCommand(0, sJson);
+	return Plugin_Handled;
 }
 
 public APLRes AskPluginLoad2(Handle hMySelf, bool bLate, char[] szError, int iErr_max)
@@ -100,31 +152,7 @@ public APLRes AskPluginLoad2(Handle hMySelf, bool bLate, char[] szError, int iEr
 
 public Action RoundStart(Event event, const char[] name, bool dontBroadcast)
 {
-	for (int i = 1; i <= MaxClients; i++)
-    {
-        iVK[i] = 0;
-    }
-}
-
-public void OnConfigsExecuted()
-{
-	g_token.GetString(szToken, 128);
-	iMsgPerRound = g_msgPerRound.IntValue;
-	if (g_servername.BoolValue)
-	{
-		Handle hHostName;
-		if(hHostName == INVALID_HANDLE)
-		{
-			if( (hHostName = FindConVar("hostname")) == INVALID_HANDLE)
-			{
-				PrintToServer("[Chat2VK] Плагин сломался.");
-				return;
-			}
-		}
-		GetConVarString(hHostName, szSName, sizeof(szSName));
-		ReplaceString(szSName, sizeof(szSName), " ", "%20", false);
-	}
-	
+	for (int i = 1; i <= MaxClients; i++) iVK[i] = 0;
 }
 
 public Action VKsend(int iArgs)
@@ -136,209 +164,123 @@ public Action VKsend(int iArgs)
 	}
 	else
 	{
-		char szTextFromVK[400], szTipaBuffer[2][400];
-		GetCmdArgString(szTextFromVK, sizeof(szTextFromVK));
-		ReplaceString(szTextFromVK, sizeof(szTextFromVK), "\"", "", false);
-		ExplodeString(szTextFromVK, "&", szTipaBuffer, sizeof(szTipaBuffer), sizeof(szTipaBuffer[]));
+		char sVK[512], sBuffer[2][512];
+		GetCmdArgString(sVK, sizeof(sVK));
+		ReplaceString(sVK, sizeof(sVK), "\"", "", false);
+		ExplodeString(sVK, "&", sBuffer, sizeof(sBuffer), sizeof(sBuffer[]));
 		
-		if (strlen(szTipaBuffer[1]) < 1){
-			char szURL[1024], szName[2048], szRawMap[PLATFORM_MAX_PATH];
-			int iC = 0;
-			for (int i = 1; i <= MaxClients; i++)
-			{
-				if (IsClientInGame(i) && !IsFakeClient(i))
-				{
-					Format(szName, sizeof(szName), "%s%N ^:-", szName,i);
-					ReplaceString(szName, sizeof(szName), "&", "");
-					iC++;
-				}
-			}
-			GetCurrentMap(szRawMap, sizeof(szRawMap));
-			GetMapDisplayName(szRawMap, szRawMap, sizeof(szRawMap));
-			if (g_servername.BoolValue)
-			{
-				FormatEx(szURL, sizeof(szURL), "https://api.vk.com/method/messages.send?chat_id=1&message=Сервер : %s^:-Онлайн : %i игроков. Карта : %s^:-^:-%s&v=5.80&access_token=%s",szSName,iC,szRawMap,szName,szToken);
-			}
-			else
-			{
-				FormatEx(szURL, sizeof(szURL), "https://api.vk.com/method/messages.send?chat_id=1&message=Онлайн : %i игроков. Карта : %s^:-^:-%s&v=5.80&access_token=%s",iC,szRawMap,szName,szToken);
-			}
-
-			ReplaceString(szURL, sizeof(szURL), " ", "%20");
-			ReplaceString(szURL, sizeof(szURL), "^:-", "%0A");
-			ReplaceString(szURL, sizeof(szURL), "#", "%23");
-			ReplaceString(szURL, sizeof(szURL), "+", "%2B");
-
-
-			SendMessage(szURL);
-			
-			return Plugin_Handled;
+		if (strlen(sBuffer[1]) < 1) return Plugin_Handled;
+		
+		if (iCSGO){
+			PrintToChatAll(" \x0B>>\x01 %s \x0Bпишет из VK:", sBuffer[0]);
+			PrintToChatAll( " \x0B>>\x01 %s " , sBuffer[1] );
+		}
+		else {
+			PrintToChatAll(">> %s пишет из VK:", sBuffer[0]);
+			PrintToChatAll(">> %s ", sBuffer[1]);
 		}
 		
-		PrintToChatAll(" \x0B>>\x01 %s \x0Bпишет из VK :", szTipaBuffer[0]);
-		PrintToChatAll( " \x0B>>\x01 %s " , szTipaBuffer[1] );
 		
-		if (g_logging.BoolValue)
-		{
-			LogMessage("%s пишет из VK : %s", szTipaBuffer[0],szTipaBuffer[1]);
-		}
+		if (iLogging > 0) LogMessage("%s пишет из VK: %s", sBuffer[0],sBuffer[1]);
 		return Plugin_Handled;
 	}
 }
 
 public Action VKsay(int iClient, int iArgs)
 {
-	if (iClient == 0)
+	if (iClient == 0) PrintToServer("[Chat2VK] Эта команда для клиента!");
+	else if (iArgs < 1) PrintToChat(iClient, "%s", iCSGO ? " \x06>>\x01 Использование команды : \x06/vk текст!" : ">> Использование команды : /vk текст");
+	else if (iVK[iClient] < iMessagesPerRound)
 	{
-		char szURL[1024],szText[256];
-		GetCmdArgString(szText, sizeof(szText));
-		if (g_servername.BoolValue)
+		//Проверка BaseComms
+		if (iBaseComms && (BaseComm_IsClientGagged(iClient)))
 		{
-			FormatEx(szURL, sizeof(szURL), "https://api.vk.com/method/messages.send?chat_id=1&message=Консоль пишет :NEWLINE NEWLINE%s NEWLINE NEWLINEСервер : %s&v=5.80&access_token=%s",szText,szSName,szToken);
-		}
-		else
-		{
-			FormatEx(szURL, sizeof(szURL), "https://api.vk.com/method/messages.send?chat_id=1&message=Консоль пишет :NEWLINE NEWLINE%s&v=5.80&access_token=%s",szText,szToken);
-		}
-		//Костыли :
-		ReplaceString(szURL, sizeof(szURL), " ", "%20", false);
-		ReplaceString(szURL, sizeof(szURL), "NEWLINE", "%0A", false);
-		ReplaceString(szURL, sizeof(szURL), "#", "%23", false);
-		SendMessage(szURL);
-		return Plugin_Handled;
-	}
-	
-	if(iArgs < 1)
-	{
-		PrintToChat(iClient," \x06>>\x01 Использование команды : \x06/vk текст!");
-		return Plugin_Handled;
-	}
-	
-	char szText[256];
-	GetCmdArgString(szText, sizeof(szText));
-	if (g_check.BoolValue)
-	{
-		Handle hFile = OpenFile(szPath, "r");
-		if (hFile == INVALID_HANDLE)
-		{
-			PrintToServer("[Chat2VK] Сломался файл check.txt!");
-			return Plugin_Stop;
-		}
-		char szLine[256];
-		while (!IsEndOfFile(hFile) && ReadFileLine(hFile, szLine, sizeof(szLine)))
-		{
-			//Дебаг :
-			//PrintToConsole(iClient,"Текст : %s ; юзер : %s",szLine,szText);
-			
-			//Проверка забаганная. Допустим в check.txt есть string. Игрок НЕ сможет послать s,st,str,stri,strin,string, НО сможет послать stringg
-			//Пытаюсь исправить ситуацию... Вместо этого :
-			//if (StrContains(szLine, szText, false) != -1)
-			//Лепим обратную проверку :
-			if ((StrContains(szLine, szText, false) != -1) || (StrContains(szText, szLine, false) != -1))
-			{
-				PrintToConsoleAll("Нельзя : %s",szLine);
-				PrintToChat(iClient, " \x02>>\x01 Запрещённое сообщение! :<");
-				if (g_logging.BoolValue)
-				{
-					LogAction(iClient, -1, "\"%L\" пытался отправить : %s, запрет на : %s", iClient, szText, szLine);
-				}
-				return Plugin_Handled;
-			}
-			//И всё равно не работает. Да и не очень хотелось...
-		}
-		CloseHandle(hFile);
-	}
-	
-	if (iVK[iClient] < iMsgPerRound)
-	{
-		//Проверка SourceComms
-		if ((g_sourcecomms.BoolValue) && (SourceComms_GetClientGagType(iClient) != bNot))
-		{
-			PrintToChat(iClient, " \x02>>\x01 Тебе отключили чатик! :<");
+			PrintToChat(iClient, "%s", iCSGO ? " \x02>>\x01 Тебе отключили чатик! :<" : ">> Тебе отключили чатик! :<");
 			return Plugin_Handled;
 		}
-		char szURL[1024];
-		char szSteam[64];
-		if (g_link.BoolValue)
-		{
-			GetClientAuthId(iClient, AuthId_SteamID64, szSteam, sizeof(szSteam), true);
-			Format(szSteam, sizeof(szSteam), "steamcommunity.com/profiles/%s", szSteam);
-		}
-		else
-		{
-			GetClientAuthId(iClient, AuthId_Steam2, szSteam, sizeof(szSteam), true);
-		}
 		
-		if (g_servername.BoolValue)
-		{
-			FormatEx(szURL, sizeof(szURL), "https://api.vk.com/method/messages.send?chat_id=1&message=Игрок \"%N\" (%s) пишет :NEWLINE NEWLINE%s NEWLINE NEWLINEСервер : %s&v=5.80&access_token=%s",iClient,szSteam,szText,szSName,szToken);
-		}
-		else
-		{
-			FormatEx(szURL, sizeof(szURL), "https://api.vk.com/method/messages.send?chat_id=1&message=Игрок \"%N\" (%s) пишет :NEWLINE NEWLINE%s&v=5.80&access_token=%s",iClient,szSteam,szText,szToken);
-		}
+		char sSteam[64];
+		GetCmdArgString(sText[iClient], sizeof(sText[]));
+		GetClientAuthId(iClient, AuthId_SteamID64, sSteam, sizeof(sSteam), true);
+		Format(sSteam, sizeof(sSteam), "steamcommunity.com/profiles/%s", sSteam);
+		
+		if (iIncludeServerName) Format(sText[iClient], sizeof(sText[]), "Игрок \"%N\" [ %s ] пишет :NEWLINE NEWLINE%s NEWLINE NEWLINEСервер : %s",iClient,sSteam,sText[iClient],sServerName);
+		else Format(sText[iClient], sizeof(sText[]), "Игрок \"%N\" [ %s ] пишет :NEWLINE NEWLINE%s",iClient,sSteam,sText[iClient]);
 		
 		//Костыли :
-		ReplaceString(szURL, sizeof(szURL), " ", "%20", false);
-		ReplaceString(szURL, sizeof(szURL), "NEWLINE", "%0A", false);
-		ReplaceString(szURL, sizeof(szURL), "#", "%23", false);
+		ReplaceString(sText[iClient], sizeof(sText[]), " ", "%20", false);
+		ReplaceString(sText[iClient], sizeof(sText[]), "NEWLINE", "%0A", false);
+		ReplaceString(sText[iClient], sizeof(sText[]), "#", "%23", false);
 		
-		//Дебаг :
-		//PrintToConsole(iClient,szURL);
-	
-		SendMessage(szURL);
-
-		iVK[iClient]++;
-		PrintToChat(iClient, " \x0B>> \x01 Отправлено в беседу сервера VK!");
-		if (g_logging.BoolValue)
+		if (iChats < 1) PrintToChat(iClient, "%s", iCSGO ? " \x0B>> \x01 Chat2VK не работает.. временно." : ">> Chat2VK не работает.. временно.");
+		else if (iChats == 1)
 		{
-			LogAction(iClient, -1, "\"%L\" отправил : %s", iClient, szURL);
+			SendMessage(StringToInt(sValueID), sText[iClient]);
+			iVK[iClient]++;
+			if (iLogging) LogAction(iClient, -1, "\"%L\" отправил : %s", iClient, sText[iClient]);
 		}
+		else menu_chats.Display(iClient, 0);
 	}
-	else
-	{
-		char szOutOfLimits[128];
-		Format(szOutOfLimits, sizeof(szOutOfLimits)," \x02>>\x01 Можно писать в VK %i раз в раунд!",iMsgPerRound);
-		PrintToChat(iClient, szOutOfLimits);
-	}
+	else PrintToChat(iClient, " >> Можно писать в VK %i раз в раунд!",iMessagesPerRound);
 	return Plugin_Handled;
 }
 
-void SendMessage(const char[] szURL)
-{
-	if (STEAMWORKS_ON())
-	{
-		SW_SendMessage(szURL);
-	} else if (RIP_ON())
-	{
-		RIP_SendMessage(szURL);
-	} else
-	{
-		LogError("Ошибка отправки сообщения!");
+public int hmenu(Menu m, MenuAction action, int iClient, int iParam2){
+	switch (action){
+		case MenuAction_Select:{
+			char sID[50];
+			m.GetItem(iParam2, sID, sizeof(sID));
+			SendMessage(StringToInt(sID), sText[iClient]);
+			iVK[iClient]++;
+			if (iLogging) LogAction(iClient, -1, "\"%L\" отправил : %s", iClient, sText[iClient]);
+		}
 	}
+	return 0;
+}
+
+void SendMessage(int iID, const char[] sMessage)
+{
+	char sURL[1024];
+	if(iID >= 2000000000){
+		iID -= 2000000000;
+		FormatEx(sURL, sizeof(sURL), "https://api.vk.com/method/messages.send?v=5.101&random_id=%i&access_token=%s&chat_id=%i&message=%s",
+			GetRandomInt(0, 100500),
+			sToken,
+			iID,
+			sMessage
+		);
+	}
+	else{
+		FormatEx(sURL, sizeof(sURL), "https://api.vk.com/method/messages.send?v=5.101&random_id=%i&access_token=%s&user_id=%i&message=%s",
+			GetRandomInt(0, 100500),
+			sToken,
+			iID,
+			sMessage
+		);
+	}
+	
+	if (STEAMWORKS_ON()) SW_SendMessage(sURL);
+	else if (RIP_ON()) RIP_SendMessage(sURL);
+	else LogError("Ошибка отправки сообщения!");
 }
 
 #if defined _ripext_included_
-void RIP_SendMessage(const char[] szURL)
+void RIP_SendMessage(const char[] sURL)
 {
 	g_hHTTPClient.SetHeader("User-Agent", "Test");
-
-	g_hHTTPClient.Get(szURL[19], OnRequestCompleteRIP);
+	g_hHTTPClient.Get(sURL[19], OnRequestCompleteRIP);
 }
 
 public void OnRequestCompleteRIP(HTTPResponse hResponse, any iData)
 {
-	if (hResponse.Status != HTTPStatus_OK)
-	{
-		LogMessage("Отклик VK : %d", hResponse.Status);
-	}
+	if (hResponse.Status != HTTPStatus_OK && iLogging) LogMessage("Отклик VK : %d", hResponse.Status);
 }
 #endif
 
 #if defined _SteamWorks_Included
-void SW_SendMessage(const char[] szURL)
+void SW_SendMessage(const char[] sURL)
 {
-	Handle hRequest = SteamWorks_CreateHTTPRequest(k_EHTTPMethodGET, szURL);
+	Handle hRequest = SteamWorks_CreateHTTPRequest(k_EHTTPMethodGET, sURL);
 	SteamWorks_SetHTTPCallbacks(hRequest, OnRequestCompleteSW);
 	SteamWorks_SetHTTPRequestHeaderValue(hRequest, "User-Agent", "Test");
 	SteamWorks_SendHTTPRequest(hRequest);
@@ -352,9 +294,6 @@ public int OnRequestCompleteSW(Handle hRequest, bool bFailure, bool bRequestSucc
 	SteamWorks_GetHTTPResponseBodyData(hRequest, sBody, length);
 	delete hRequest;
 
-	if (g_logging.BoolValue)
-	{
-		LogMessage("Отклик VK : %s",sBody);
-	}
+	if (iLogging) LogMessage("Отклик VK : %s",sBody);
 }
 #endif
