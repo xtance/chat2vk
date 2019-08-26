@@ -1,6 +1,4 @@
 #include <sourcemod>
-#include <cstrike>
-#include <ripext>
 
 #undef REQUIRE_PLUGIN
 #include <basecomm>
