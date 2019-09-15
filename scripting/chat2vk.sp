@@ -18,7 +18,7 @@ HTTPClient g_hHTTPClient;
 #endif
 
 int iChats, iCSGO, iIncludeServerName, iBaseComms, iMessagesPerRound, iLogging, iVK[MAXPLAYERS + 1], iSteam[MAXPLAYERS + 1];
-char sToken[128],sServerName[256], sSection[100],sValueID[100], sText[MAXPLAYERS+1][256], sName[MAXPLAYERS+1][64];
+char sToken[128],sServerName[256], sSection[100],sValueID[100], sText[MAXPLAYERS+1][300], sName[MAXPLAYERS+1][64];
 Menu menu_chats;
 
 public Plugin myinfo =
@@ -90,6 +90,11 @@ public void OnPluginStart()
 	} else SetFailState("[Chat2VK] KeyValues Error!");
 	delete kv;
 	
+	
+	for (int i = 1; i<=MaxClients; i++) OnClientPostAdminCheck(i);
+}
+
+public void OnConfigsExecuted(){
 	if (iIncludeServerName){
 		Handle hHostName;
 		if(hHostName == INVALID_HANDLE)
@@ -103,8 +108,6 @@ public void OnPluginStart()
 		GetConVarString(hHostName, sServerName, sizeof(sServerName));
 		ReplaceString(sServerName, sizeof(sServerName), " ", "%20", false);
 	}
-	
-	for (int i = 1; i<=MaxClients; i++) OnClientPostAdminCheck(i);
 }
 
 public void OnClientPostAdminCheck(int iClient) {
@@ -117,15 +120,23 @@ public void OnClientPostAdminCheck(int iClient) {
 }
 
 public Action Action_Web_GetPlayers(int iArgs){
-	char sJson[1512];
+	PrintToServer("[");
 	for (int i = 1; i<=MaxClients; i++){
 		if (IsClientInGame(i) && !IsFakeClient(i)){
-			Format(sJson, sizeof(sJson), "{\"name\": \"%s\", \"steamid\": %i, \"k\": %i, \"d\": %i },%s",sName[i],iSteam[i],GetClientFrags(i),GetClientDeaths(i),sJson);
+			PrintToServer("{\"name\": \"%s\", \"steamid\": %i, \"k\": %i, \"d\": %i},",sName[i],iSteam[i],GetClientFrags(i),GetClientDeaths(i));
+			//Format(sJson, sizeof(sJson), "{\"name\": \"%s\", \"steamid\": %i, \"k\": %i, \"d\": %i},%s",sName[i],iSteam[i],GetClientFrags(i),GetClientDeaths(i),sJson);
+		}
+	}
+	PrintToServer("]ArrayEnd");
+	
+	/*for (int i = 1; i<=MaxClients; i++){
+		if (IsClientInGame(i) && !IsFakeClient(i)){
+			Format(sJson, sizeof(sJson), "{\"name\": \"%s\", \"steamid\": %i, \"k\": %i, \"d\": %i},%s",sName[i],iSteam[i],GetClientFrags(i),GetClientDeaths(i),sJson);
 		}
 	}
 	Format(sJson, sizeof(sJson), "[%s]", sJson);
 	ReplaceString(sJson, sizeof(sJson), ",]", "]", false); // :D
-	ReplyToCommand(0, sJson);
+	ReplyToCommand(0, sJson);*/
 	return Plugin_Handled;
 }
 
@@ -202,13 +213,8 @@ public Action VKsay(int iClient, int iArgs)
 		GetClientAuthId(iClient, AuthId_SteamID64, sSteam, sizeof(sSteam), true);
 		Format(sSteam, sizeof(sSteam), "steamcommunity.com/profiles/%s", sSteam);
 		
-		if (iIncludeServerName) Format(sText[iClient], sizeof(sText[]), "Игрок \"%N\" [ %s ] пишет :NEWLINE NEWLINE%s NEWLINE NEWLINEСервер : %s",iClient,sSteam,sText[iClient],sServerName);
-		else Format(sText[iClient], sizeof(sText[]), "Игрок \"%N\" [ %s ] пишет :NEWLINE NEWLINE%s",iClient,sSteam,sText[iClient]);
-		
-		//Костыли :
-		ReplaceString(sText[iClient], sizeof(sText[]), " ", "%20", false);
-		ReplaceString(sText[iClient], sizeof(sText[]), "NEWLINE", "%0A", false);
-		ReplaceString(sText[iClient], sizeof(sText[]), "#", "%23", false);
+		if (iIncludeServerName) Format(sText[iClient], sizeof(sText[]), "Игрок \"%N\" [ %s ] пишет :NWLN NWLN%s NWLN NWLNСервер : %s",iClient,sSteam,sText[iClient],sServerName);
+		else Format(sText[iClient], sizeof(sText[]), "Игрок \"%N\" [ %s ] пишет :NWLN NWLN%s",iClient,sSteam,sText[iClient]);
 		
 		if (iChats < 1) PrintToChat(iClient, "%s", iCSGO ? " \x0B>> \x01 Chat2VK не работает.. временно." : ">> Chat2VK не работает.. временно.");
 		else if (iChats == 1)
@@ -238,7 +244,7 @@ public int hmenu(Menu m, MenuAction action, int iClient, int iParam2){
 
 void SendMessage(int iID, const char[] sMessage)
 {
-	char sURL[1024];
+	char sURL[2000];
 	if(iID >= 2000000000){
 		iID -= 2000000000;
 		FormatEx(sURL, sizeof(sURL), "https://api.vk.com/method/messages.send?v=5.101&random_id=%i&access_token=%s&chat_id=%i&message=%s",
@@ -257,6 +263,10 @@ void SendMessage(int iID, const char[] sMessage)
 		);
 	}
 	
+	//Костыли :
+	ReplaceString(sURL, sizeof(sURL), " ", "%20", false);
+	ReplaceString(sURL, sizeof(sURL), "NWLN", "%0A", false);
+	ReplaceString(sURL, sizeof(sURL), "#", "%23", false);
 	if (STEAMWORKS_ON()) SW_SendMessage(sURL);
 	else if (RIP_ON()) RIP_SendMessage(sURL);
 	else LogError("Ошибка отправки сообщения!");
