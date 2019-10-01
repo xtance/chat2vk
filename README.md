@@ -9,4 +9,6 @@
 Исполнение rcon команд из VK
 
 
-## Гайд по настройке - https://hlmod.ru/resources/chat-2-vkontakte.959/
+## Последняя версия здесь https://hlmod.ru/resources/chat-2-vkontakte.959/
+
+И инструкция по установке там же.
